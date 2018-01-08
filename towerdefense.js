@@ -46,18 +46,14 @@ var none  = 'n';
 var final = 'f';
 
 class Cell {
-  constructor(row, col, size, type) {
-    this.row = row;
-    this.col = col;
+  constructor(x, y, size, type) {
+    this.x = x;
+    this.y = y;
     this.size = size;
     this.type = type;
-    //TODO: should start as none on constructor, wiped to none before pathfinding, set in pathfinding
-    /*var dirVal = Math.floor(Math.random()*4) + 1;
-    if(dirVal == 1)this.next = down;
-    if(dirVal == 2)this.next = left;
-    if(dirVal == 3)this.next = up;
-    if(dirVal == 4)this.next = right;*/
-    this.next = down;
+    this.next = none;
+    this.prev = none;
+    this.turret = none;
   }
 
   render(){
@@ -70,23 +66,40 @@ class Cell {
     } else if(this.type == end || this.type==final){
       context.fillStyle = "#FF0000"
     }
-    context.fillRect(this.col*this.size, this.row*this.size, this.size, this.size);
+    context.fillRect(this.x*this.size, this.y*this.size, this.size, this.size);
     if(this.type == final){
       context.beginPath();
-      context.moveTo(this.col*this.size, this.row*this.size);
-      context.lineTo((this.col+1)*this.size, (this.row+1)*this.size);
+      context.moveTo(this.x*this.size, this.y*this.size);
+      context.lineTo((this.x+1)*this.size, (this.y+1)*this.size);
       context.stroke();
       context.beginPath();
-      context.moveTo((this.col+1)*this.size, this.row*this.size);
-      context.lineTo(this.col*this.size, (this.row+1)*this.size);
+      context.moveTo((this.x+1)*this.size, this.y*this.size);
+      context.lineTo(this.x*this.size, (this.y+1)*this.size);
       context.stroke();
       context.beginPath();
-      context.moveTo(this.col*this.size, this.row*this.size);
-      context.lineTo(this.col*this.size, (this.row+1)*this.size);
+      context.moveTo(this.x*this.size, this.y*this.size);
+      context.lineTo(this.x*this.size, (this.y+1)*this.size);
       context.stroke();
     }
   }
 }
+
+//----------Turret----------
+var splash  = 's'
+var gun     = 'g'
+
+class Turret{
+  constructor(type, x, y){
+    this.type = type;
+    this.x = x;
+    this.y = y;
+  }
+
+  render(){
+    
+  }
+}
+
 
 //-----------Map------------
 class Map{
@@ -98,24 +111,24 @@ class Map{
     this.creepLowerBound = cellSize/4;
     this.creeps = [];
     this.grid = [];
-    for(var i = 0; i < this.height; i++){
+    for(var i = 0; i < this.width; i++){
       this.grid[i] = [];
-      for(var j = 0; j < this.width; j++){
+      for(var j = 0; j < this.height; j++){
         this.grid[i][j] = new Cell(i, j, cellSize, blank);
       }
     }
     for(var i = 0; i < this.width; i++){
-      this.grid[0][i].type = start;
-      this.grid[this.height-1][i].type = end;
-      this.grid[this.height-1][i].next = right;
+      this.grid[i][0].type = start;
+      this.grid[i][this.height-1].type = end;
+      //this.grid[i][this.height-1].next = right;
     }
-    this.grid[this.height-1][this.width-1].type = final;
-    this.grid[this.height-1][this.width-1].next = none;
+    this.grid[this.width-1][this.height-1].type = final;
+    this.grid[this.width-1][this.height-1].next = none;
   }
 
   render(){
-    for(var i = 0; i < this.height; i++){
-      for(var j = 0; j < this.width; j++){
+    for(var i = 0; i < this.width; i++){
+      for(var j = 0; j < this.height; j++){
         this.grid[i][j].render();
       }
     }
@@ -145,24 +158,103 @@ class Map{
   selectCell(x, y){
     var gridX = Math.floor(x/this.cellSize);
     var gridY = Math.floor(y/this.cellSize);
-    return this.grid[gridY][gridX];
+    return this.grid[gridX][gridY];
+  }
+
+  doSearch(){
+    var found = false;
+
+    for(var i = 0; i < this.width; i++){
+      for(var j = 0; j < this.height; j++){
+        this.grid[i][j].next = none;
+      }
+    }
+
+    var queue = [];
+    queue.push(this.grid[this.width-1][this.height-1]);
+
+    while(queue.length != 0){
+      var curr = queue.shift();
+      console.log(curr);
+      if(curr.x > 0){
+        var cand = this.grid[curr.x-1][curr.y];
+        if(cand.type != tower && cand.next == none){
+          cand.next = right;
+          queue.push(cand);
+          if(cand.type == start){
+            found = true;
+          }
+        }
+      }
+      if(curr.x < this.width - 1){
+        var cand = this.grid[curr.x+1][curr.y];
+        if(cand.type != tower && cand.next == none){
+          cand.next = left;
+          queue.push(cand);
+          if(cand.type == start){
+            found = true;
+          }
+        }
+      }
+      if(curr.y > 0){
+        var cand = this.grid[curr.x][curr.y-1];
+        if(cand.type != tower && cand.next == none){
+          cand.next = down;
+          queue.push(cand);
+          if(cand.type == start){
+            found = true;
+          }       
+        }
+      }
+      if(curr.y < this.height - 1){
+        var cand = this.grid[curr.x][curr.y+1];
+        if(cand.type != tower && cand.next == none){
+          cand.next = up;
+          queue.push(cand);
+          if(cand.type == start){
+            found = true;
+          }
+        }
+      }
+    }
+    return found;
+  }
+
+  creepInCell(cell){
+    for(var i = 0; i < this.creeps.length; i++){
+      var currCreep = this.creeps[i];
+      var creepCell = this.selectCell(currCreep.x, currCreep.y);
+      if(creepCell.x == cell.x && creepCell.y == cell.y) return true;
+    }
+    return false;
   }
 
   buildTower(cell){
     //TODO: try to update pathfind here, make sure building it is legal (pathfind is successful), if not alert/return
     if(cell.type == blank){
-      cell.type = tower;
+      if(!this.creepInCell(cell)){
+        cell.type = tower;
+        var valid = this.doSearch();
+        console.log(valid);
+        if(!valid) {
+          cell.type = blank;
+          this.doSearch();
+        } else {
+          cell.type = tower;
+        }
+      }
     }
   }
 
   sellTower(cell){
     if(cell.type == tower){
+      this.doSearch();
       cell.type = blank;
     }
   }
 
   spawnCreep(){
-    //spawns creep in random position towards center of a starting cell
+    //spawns creep in random position towards center of starting cell
     var x = (Math.floor(Math.random()*this.width) * this.cellSize) + (Math.random()*(this.creepUpperBound - this.creepLowerBound) + this.creepLowerBound);
     var y = (Math.random()*(this.creepUpperBound - this.creepLowerBound) + this.creepLowerBound);
     var creep = new Creep(x, y, 3);
@@ -177,7 +269,7 @@ class Creep{
   constructor(x, y, radius){
     this.x = x;
     this.y = y;
-    this.speed = 1;
+    this.speed = 2;
     this.radius = radius;
     this.dir = none;
     this.dist = 0;
@@ -193,44 +285,35 @@ class Creep{
   move(){
     var diff = this.dist - this.speed;
     if(this.dir == up){
-      if(diff < 0){
-        this.y -= this.dist;
-        this.dir = none;
-        this.dist = 0;
-      } else{
-        this.y -= this.speed;
-        this.dist = diff;
-      }
+      this.moveHelp(diff, 'y', -1);
     }
     else if(this.dir == down){
-      if(diff < 0){
-        this.y += this.dist;
-        this.dir = none;
-        this.dist = 0;
-      } else{
-        this.y += this.speed;
-        this.dist = diff;
-      }
+      this.moveHelp(diff, 'y', 1);
     }
     else if(this.dir == left){
-      if(diff < 0){
-        this.x -= this.dist;
-        this.dir = none;
-        this.dist = 0;
-      } else{
-        this.x -= this.speed;
-        this.dist = diff;
-      }
+      this.moveHelp(diff, 'x', -1);
     }
     else if(this.dir == right){
-      if(diff < 0){
-        this.x += this.dist;
-        this.dir = none;
-        this.dist = 0;
-      } else{
-        this.x += this.speed;
-        this.dist = diff;
+      this.moveHelp(diff, 'x', 1);
+    }
+  } 
+
+  moveHelp(diff, axis, flip){
+    if(diff < 0){
+      if(axis == 'y'){
+        this.y += flip * this.dist;
+      } else {
+        this.x += flip * this.dist;
       }
+      this.dir = none;
+      this.dist = 0;
+    } else{
+      if(axis == 'y'){
+        this.y += flip*this.speed;
+      } else {
+        this.x += flip*this.speed;
+      }
+      this.dist = diff;
     }
   }
 
@@ -266,6 +349,7 @@ var context = canvas.getContext('2d');
 
 //note: width and height must both be divisible by cellSize
 var map = new Map(width, height, cellSize);
+map.doSearch();
 
 canvas.onclick = function(e){
   x = e.clientX - canvas.offsetLeft;
